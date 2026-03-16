@@ -53,13 +53,13 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
   Full Conversation Timeline
 ============================================================
 
-💬 [15/03/2026 09:13] Ronen:
+💬 [15/03/2026 09:13] Alice:
     Everything is a mess here, I can't deal with this
 
-🎙️  [15/03/2026 09:22] Ronen:
+🎙️  [15/03/2026 09:22] Alice:
     📝 Transcript: I'm trying to work on it but it's taking me forever...
 
-💬 [15/03/2026 09:30] Aviel:
+💬 [15/03/2026 09:30] Bob:
     Found the issue — fix is ready.
 
 ============================================================
@@ -69,24 +69,24 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
 📊 Stats:
    Total messages: 47
    Voice messages: 12
-   Ronen: 38 messages
-   Aviel: 9 messages
+   Alice: 38 messages
+   Bob: 9 messages
 
 ⚠️  Friction moments (8):
-   [09:13] Ronen: "Everything is a mess..."
+   [09:13] Alice: "Everything is a mess..."
    🏷  frustration: mess, can't
 
 ✅ Positive moments (2):
-   [09:30] Ronen: "Amazing, thank you so much"
+   [09:30] Alice: "Amazing, thank you so much"
 
 👤 Per-sender breakdown:
-   Ronen:
+   Alice:
    Messages: 38 (12 voice)
    ⚠️  frustration: 8 messages
    ⚠️  time_pressure: 5 messages
    ✅ positive: 2 messages
 
-   Aviel:
+   Bob:
    Messages: 9 (0 voice)
    — No negative signals detected
 ```
