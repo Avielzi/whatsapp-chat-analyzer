@@ -74,7 +74,7 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
 
 ⚠️  Friction moments (5):
    [09:13] User A: "Sample message with a friction signal..."
-   🏷  frustration: [signal_word]
+   🏷  negative_sentiment: [signal_word]
 
 ✅ Positive moments (3):
    [09:30] User B: "Sample positive feedback message"
@@ -82,8 +82,8 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
 👤 Per-sender breakdown:
    User A:
    Messages: 30 (10 voice)
-   ⚠️  frustration: 4 messages
-   ✅ positive: 1 message
+   ⚠️  negative_sentiment: 4 messages
+   ✅ positive_feedback: 1 message
 
    User B:
    Messages: 20 (0 voice)
@@ -92,15 +92,15 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
 
 ## Signal Categories
 
-| Category | Example triggers |
-|----------|-----------------|
-| `frustration` | mess, annoying, can't, fed up, exhausted |
-| `dissatisfaction` | not happy, disappointing, not what I asked |
-| `time_pressure` | urgent, taking too long, already a week |
-| `confusion` | not clear, don't understand, can't find |
-| `technical_issues` | broken, not working, crashed, error |
-| `doubt_regret` | not sure, thinking of canceling, waste |
-| `positive` ✅ | great, approved, happy, thank you |
+| Category | Description / Example Triggers |
+|----------|-------------------------------|
+| `negative_sentiment` | expressions of frustration, difficulty, or issues |
+| `unsatisfied` | feedback indicating expectations were not met |
+| `time_sensitive` | mentions of deadlines, delays, or urgency |
+| `clarification_needed` | instances of confusion or request for more info |
+| `system_issues` | mentions of technical problems or errors |
+| `uncertainty` | expressions of doubt or potential changes |
+| `positive_feedback` ✅ | expressions of satisfaction, approval, or gratitude |
 
 ## Use Cases
 
