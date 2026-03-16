@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-WhatsApp Chat Analyzer + Voice Transcriber
-==========================================
+WhatsApp Chat Analyzer + Voice Transcriber (Multilingual Edition)
+=================================================================
 Analyzes WhatsApp export, transcribes voice messages with Whisper,
 and generates a full timeline + conversation analysis.
+Supports English, Hebrew, and Arabic with automatic signal detection.
 
 Usage:
     pip install openai-whisper
@@ -32,7 +33,22 @@ MSG_PATTERN = re.compile(
     re.MULTILINE
 )
 VOICE_PATTERN = re.compile(r'<attached:\s*(.*\.(?:opus|ogg|m4a|mp3|aac))\s*>', re.IGNORECASE)
-OMITTED_PATTERN = re.compile(r'(audio omitted|voice message|הודעה קולית|קובץ קולי)', re.IGNORECASE)
+OMITTED_PATTERN = re.compile(r'(audio omitted|voice message|הודעה קולית|קובץ קולי|رسالة صوتية)', re.IGNORECASE)
+
+
+def detect_language(text: str) -> str:
+    """Basic language detection based on character sets."""
+    hebrew_chars = len(re.findall(r'[\u0590-\u05FF]', text))
+    arabic_chars = len(re.findall(r'[\u0600-\u06FF]', text))
+    english_chars = len(re.findall(r'[a-zA-Z]', text))
+    
+    if hebrew_chars > arabic_chars and hebrew_chars > english_chars:
+        return "Hebrew"
+    elif arabic_chars > hebrew_chars and arabic_chars > english_chars:
+        return "Arabic"
+    elif english_chars > 0:
+        return "English"
+    return "Unknown"
 
 
 def parse_chat(txt_path: str) -> list[dict]:
@@ -61,6 +77,7 @@ def parse_chat(txt_path: str) -> list[dict]:
                 'is_voice': False,
                 'voice_file': None,
                 'transcript': None,
+                'detected_lang': detect_language(body.strip())
             }
             # Detect voice message
             vm = VOICE_PATTERN.search(body)
@@ -72,6 +89,7 @@ def parse_chat(txt_path: str) -> list[dict]:
         elif current:
             # Continuation line
             current['body'] += '\n' + line
+            current['detected_lang'] = detect_language(current['body'])
 
     if current:
         messages.append(current)
@@ -131,11 +149,12 @@ def transcribe_voices(messages: list[dict], media_dir: str, model_size: str = 'm
 
         print(f"  [{i}/{len(voice_msgs)}] Transcribing: {os.path.basename(audio_path)}...")
         try:
-            # Detect language or specify if needed
+            # Let Whisper detect the language automatically
             result = model.transcribe(audio_path, task='transcribe')
             transcript = result['text'].strip()
             msg['transcript'] = transcript
-            print(f"          ✅ {transcript[:80]}{'...' if len(transcript)>80 else ''}")
+            msg['detected_lang'] = detect_language(transcript)
+            print(f"          ✅ [{msg['detected_lang']}] {transcript[:80]}{'...' if len(transcript)>80 else ''}")
         except Exception as e:
             msg['transcript'] = f'[Transcription error: {e}]'
             print(f"          ❌ Error: {e}")
@@ -151,7 +170,7 @@ def build_timeline(messages: list[dict]) -> str:
     lines.append("=" * 60)
 
     for msg in messages:
-        prefix = f"[{msg['date']} {msg['time']}] {msg['sender']}"
+        prefix = f"[{msg['date']} {msg['time']}] {msg['sender']} ({msg['detected_lang']})"
 
         if msg['is_voice']:
             transcript = msg['transcript'] or '[Not transcribed]'
@@ -167,7 +186,7 @@ def build_timeline(messages: list[dict]) -> str:
 
 
 def analyze_conversation(messages: list[dict]) -> str:
-    """Generate conversation analysis with generic signal categories."""
+    """Generate conversation analysis with generic signal categories for EN, HE, AR."""
     senders = {}
     voice_count = 0
     total = len(messages)
@@ -178,58 +197,67 @@ def analyze_conversation(messages: list[dict]) -> str:
         if msg['is_voice']:
             voice_count += 1
 
-    # ── Generic signal categories ──────────────────────────
+    # ── Multilingual signal categories ──────────────────────────
     SIGNALS = {
-        'negative_sentiment': [
-            'מתסכל', 'תסכול', 'מעצבן', 'עצבני', 'כועס', 'כעס', 'נמאס',
-            'בלאגן', 'על הפנים', 'חרא', 'זבל', 'גרוע', 'איום', 'נורא',
-            'frustrated', 'annoying', 'terrible', 'awful', 'angry', 'hate'
-        ],
-        'unsatisfied': [
-            'לא מרוצה', 'לא אוהב', 'לא טוב', 'לא עובד', 'אכזבה', 'מאכזב',
-            'not happy', 'disappointed', 'disappointing', 'not what i asked'
-        ],
-        'time_sensitive': [
-            'דחוף', 'מהר', 'עכשיו', 'מיד', 'אין זמן', 'מאחר', 'דדליין',
-            'urgent', 'asap', 'hurry', 'no time', 'late', 'deadline'
-        ],
-        'clarification_needed': [
-            'לא הבנתי', 'לא ברור', 'מבולבל', 'הסבר', 'תסביר', 'מה הכוונה',
-            'dont understand', 'not clear', 'confused', 'explain', 'what do you mean'
-        ],
-        'system_issues': [
-            'לא עובד', 'שבור', 'תקוע', 'קפא', 'קרס', 'שגיאה', 'בעיה', 'תקלה',
-            'broken', 'not working', 'crashed', 'error', 'bug', 'failed'
-        ],
-        'uncertainty': [
-            'לא בטוח', 'אולי', 'חושב לבטל', 'ספק', 'חרטה',
-            'not sure', 'maybe', 'cancel', 'doubt', 'regret'
-        ],
-        'positive_feedback': [
-            'מעולה', 'מדהים', 'כל הכבוד', 'יפה', 'טוב', 'אחלה', 'סבבה', 'תודה',
-            'great', 'amazing', 'good', 'perfect', 'thanks', 'thank you', 'awesome'
-        ],
+        'negative_sentiment': {
+            'en': ['frustrated', 'annoying', 'terrible', 'awful', 'angry', 'hate', 'mess'],
+            'he': ['מתסכל', 'תסכול', 'מעצבן', 'עצבני', 'כועס', 'כעס', 'נמאס', 'בלאגן', 'על הפנים', 'חרא', 'זבל', 'גרוע', 'איום', 'נורא'],
+            'ar': ['محبط', 'مزعج', 'رهيب', 'فظيع', 'غاضب', 'أكره', 'فوضى', 'سيء', 'قرف', 'زفت']
+        },
+        'unsatisfied': {
+            'en': ['not happy', 'disappointed', 'disappointing', 'not what i asked'],
+            'he': ['לא מרוצה', 'לא אוהב', 'לא טוב', 'לא עובד', 'אכזבה', 'מאכזב'],
+            'ar': ['غير راض', 'خيبة أمل', 'مخيب للآمال', 'ليس ما طلبته', 'ما عجبني']
+        },
+        'time_sensitive': {
+            'en': ['urgent', 'asap', 'hurry', 'no time', 'late', 'deadline'],
+            'he': ['דחוף', 'מהר', 'עכשיו', 'מיד', 'אין זמן', 'מאחר', 'דדליין'],
+            'ar': ['عاجل', 'بسرعة', 'الآن', 'فورا', 'لا يوجد وقت', 'متأخر', 'موعد نهائي']
+        },
+        'clarification_needed': {
+            'en': ['dont understand', 'not clear', 'confused', 'explain', 'what do you mean'],
+            'he': ['לא הבנתי', 'לא ברור', 'מבולבל', 'הסבר', 'תסביר', 'מה הכוונה'],
+            'ar': ['لم أفهم', 'غير واضح', 'مشوش', 'اشرح', 'ماذا تقصد', 'مش فاهم']
+        },
+        'system_issues': {
+            'en': ['broken', 'not working', 'crashed', 'error', 'bug', 'failed'],
+            'he': ['לא עובד', 'שבור', 'תקוע', 'קפא', 'קרס', 'שגיאה', 'בעיה', 'תקלה'],
+            'ar': ['معطل', 'لا يعمل', 'تحطم', 'خطأ', 'خلل', 'فشل', 'مشكلة']
+        },
+        'uncertainty': {
+            'en': ['not sure', 'maybe', 'cancel', 'doubt', 'regret'],
+            'he': ['לא בטוח', 'אולי', 'חושב לבטל', 'ספק', 'חרטה'],
+            'ar': ['غير متأكد', 'ربما', 'إلغاء', 'شك', 'ندم', 'مش عارف']
+        },
+        'positive_feedback': {
+            'en': ['great', 'amazing', 'good', 'perfect', 'thanks', 'thank you', 'awesome'],
+            'he': ['מעולה', 'מדהים', 'כל הכבוד', 'יפה', 'טוב', 'אחלה', 'סבבה', 'תודה'],
+            'ar': ['عظيم', 'مذهل', 'جيد', 'ممتاز', 'شكرا', 'رائع', 'تمام', 'ممتاز']
+        },
     }
 
     friction_moments = []
     for msg in messages:
         text = (msg['body'] + ' ' + (msg['transcript'] or '')).lower()
         found_categories = {}
-        for category, words in SIGNALS.items():
-            hits = [w for w in words if w in text]
+        for category, lang_dict in SIGNALS.items():
+            # Combine all words for detection regardless of detected language
+            all_words = lang_dict['en'] + lang_dict['he'] + lang_dict['ar']
+            hits = [w for w in all_words if w in text]
             if hits:
                 found_categories[category] = hits
         if found_categories:
             friction_moments.append({
                 'time': f"{msg['date']} {msg['time']}",
                 'sender': msg['sender'],
+                'lang': msg['detected_lang'],
                 'preview': (msg['transcript'] or msg['body'])[:120],
                 'categories': found_categories,
             })
 
     lines = []
     lines.append("\n" + "=" * 60)
-    lines.append("  Conversation Analysis")
+    lines.append("  Multilingual Conversation Analysis")
     lines.append("=" * 60)
 
     lines.append(f"\n📊 Statistics:")
@@ -250,7 +278,7 @@ def analyze_conversation(messages: list[dict]) -> str:
             if not cats and 'positive_feedback' not in fm['categories']:
                 continue
             
-            lines.append(f"\n   [{fm['time']}] {fm['sender']}:")
+            lines.append(f"\n   [{fm['time']}] {fm['sender']} ({fm['lang']}):")
             lines.append(f"   \"{fm['preview']}...\"")
             for cat, hits in fm['categories'].items():
                 icon = "✅" if cat == 'positive_feedback' else "🏷"
@@ -293,7 +321,7 @@ def analyze_conversation(messages: list[dict]) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='WhatsApp Chat Analyzer + Voice Transcriber')
+    parser = argparse.ArgumentParser(description='WhatsApp Chat Analyzer + Voice Transcriber (Multilingual)')
     parser.add_argument('--chat',  required=True, help='Path to WhatsApp export .txt file')
     parser.add_argument('--media', default='',    help='Path to media folder (voice messages)')
     parser.add_argument('--model', default='medium', choices=['tiny','base','small','medium','large'],
@@ -346,7 +374,7 @@ def main():
 
     # Final summary
     print("\n" + "="*40)
-    print(" Analysis Complete")
+    print(" Multilingual Analysis Complete")
     print("="*40)
 
 
