@@ -53,41 +53,40 @@ python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
   Full Conversation Timeline
 ============================================================
 
-💬 [15/03/2026 09:13] Alice:
-    Everything is a mess here, I can't deal with this
+💬 [15/03/2026 09:13] User A:
+    This is a sample text message describing a situation.
 
-🎙️  [15/03/2026 09:22] Alice:
-    📝 Transcript: I'm trying to work on it but it's taking me forever...
+🎙️  [15/03/2026 09:22] User A:
+    📝 Transcript: This is a sample transcription of a voice message.
 
-💬 [15/03/2026 09:30] Bob:
-    Found the issue — fix is ready.
+💬 [15/03/2026 09:30] User B:
+    This is a sample response or update.
 
 ============================================================
   Conversation Analysis
 ============================================================
 
 📊 Stats:
-   Total messages: 47
-   Voice messages: 12
-   Alice: 38 messages
-   Bob: 9 messages
+   Total messages: 50
+   Voice messages: 10
+   User A: 30 messages
+   User B: 20 messages
 
-⚠️  Friction moments (8):
-   [09:13] Alice: "Everything is a mess..."
-   🏷  frustration: mess, can't
+⚠️  Friction moments (5):
+   [09:13] User A: "Sample message with a friction signal..."
+   🏷  frustration: [signal_word]
 
-✅ Positive moments (2):
-   [09:30] Alice: "Amazing, thank you so much"
+✅ Positive moments (3):
+   [09:30] User B: "Sample positive feedback message"
 
 👤 Per-sender breakdown:
-   Alice:
-   Messages: 38 (12 voice)
-   ⚠️  frustration: 8 messages
-   ⚠️  time_pressure: 5 messages
-   ✅ positive: 2 messages
+   User A:
+   Messages: 30 (10 voice)
+   ⚠️  frustration: 4 messages
+   ✅ positive: 1 message
 
-   Bob:
-   Messages: 9 (0 voice)
+   User B:
+   Messages: 20 (0 voice)
    — No negative signals detected
 ```
 
