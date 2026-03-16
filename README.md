@@ -1,131 +1,113 @@
 # WhatsApp Chat Analyzer 🎙️
 
-Analyze WhatsApp chat exports with automatic voice message transcription using Whisper.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![OpenAI Whisper](https://img.shields.io/badge/AI-Whisper-green.svg)](https://github.com/openai/whisper)
+
+A powerful tool to analyze WhatsApp chat exports with automatic voice message transcription using **OpenAI Whisper**. Gain deep insights into your conversations, detect friction points, and visualize communication patterns.
 
 Built by [Aviel.AI](https://aviel.ai)
 
-## Features
+---
 
-- 📄 Parse WhatsApp `.txt` exports (Hebrew + English + any language)
-- 🎙️ Transcribe voice messages locally using OpenAI Whisper (no API key needed)
-- 🕐 Full timeline — sender · timestamp · content, voice transcripts inline
-- ⚠️ Friction detection across 7 signal categories
-- 👤 Per-sender breakdown (works with group chats too)
-- 💾 Outputs: readable `.txt` + raw `.json`
+## 🚀 Key Features
 
-## Installation
+- **📄 Multi-Language Support**: Parse WhatsApp `.txt` exports in Hebrew, English, and other languages.
+- **🎙️ Local AI Transcription**: Transcribe voice messages (`.opus`, `.m4a`, `.ogg`) locally using Whisper—no API keys or cloud uploads required.
+- **🕐 Integrated Timeline**: View a full chronological history with voice transcripts embedded directly into the conversation flow.
+- **⚠️ Smart Signal Detection**: Automatically identify friction, urgency, and technical issues across 7 predefined categories.
+- **📊 Detailed Analytics**: Get per-sender breakdowns, message counts, and sentiment indicators.
+- **💾 Flexible Export**: Save results as human-readable `.txt` reports or raw `.json` for further data processing.
 
+---
+
+## 🛠️ Installation
+
+### 1. Prerequisites
+Ensure you have **Python 3.9+** and **FFmpeg** installed on your system.
+
+- **macOS**: `brew install ffmpeg`
+- **Ubuntu/Debian**: `sudo apt install ffmpeg`
+- **Windows**: [Download FFmpeg](https://ffmpeg.org/download.html) and add it to your PATH.
+
+### 2. Clone & Install
 ```bash
-pip install openai-whisper
-
-# macOS
-brew install ffmpeg
-
-# Ubuntu / Debian
-sudo apt install ffmpeg
+git clone https://github.com/Avielzi/whatsapp-chat-analyzer.git
+cd whatsapp-chat-analyzer
+pip install -r requirements.txt
 ```
 
-## Usage
+---
 
-**Step 1 — Export from WhatsApp:**
-Open chat → ⋮ → More → Export Chat → **With Media**
-You'll get a folder with `chat.txt` + all `.opus` audio files.
+## 📖 How to Use
 
-**Step 2 — Run:**
+### Step 1: Export Chat from WhatsApp
+1. Open the chat on your phone.
+2. Tap the menu (⋮) → **More** → **Export Chat**.
+3. Select **Include Media**.
+4. Transfer the exported folder (containing `_chat.txt` and audio files) to your computer.
+
+### Step 2: Run the Analyzer
 ```bash
-python wa_analyzer.py --chat "chat.txt" --media "./WhatsApp Chat" --out analysis
+python wa_analyzer.py --chat "path/to/_chat.txt" --media "path/to/media_folder" --out results
 ```
 
-### Options
+### Command Line Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--chat` | required | Path to WhatsApp `.txt` export |
-| `--media` | optional | Folder containing voice message files |
-| `--model` | `medium` | Whisper model size: `tiny` `base` `small` `medium` `large` |
-| `--out` | `analysis` | Output filename (no extension) |
-| `--no-transcribe` | `False` | Skip transcription, output timeline only |
+| `--chat` | *Required* | Path to the WhatsApp `.txt` export file. |
+| `--media` | *Optional* | Folder containing voice message audio files. |
+| `--model` | `medium` | Whisper model size: `tiny`, `base`, `small`, `medium`, `large`. |
+| `--out` | `analysis` | Output filename prefix (without extension). |
+| `--no-transcribe`| `False` | Skip AI transcription and only generate the text timeline. |
 
-### Output example
+---
 
-```
-============================================================
-  Full Conversation Timeline
-============================================================
+## 📈 Example Output
 
+### Timeline View
+```text
 💬 [15/03/2026 09:13] User A:
     This is a sample text message describing a situation.
 
 🎙️  [15/03/2026 09:22] User A:
-    📝 Transcript: This is a sample transcription of a voice message.
+    📝 Transcript: I am sending a voice message to test the AI transcription.
 
 💬 [15/03/2026 09:30] User B:
-    This is a sample response or update.
-
-============================================================
-  Conversation Analysis
-============================================================
-
-📊 Stats:
-   Total messages: 50
-   Voice messages: 10
-   User A: 30 messages
-   User B: 20 messages
-
-⚠️  Friction moments (5):
-   [09:13] User A: "Sample message with a friction signal..."
-   🏷  negative_sentiment: [signal_word]
-
-✅ Positive moments (3):
-   [09:30] User B: "Sample positive feedback message"
-
-👤 Per-sender breakdown:
-   User A:
-   Messages: 30 (10 voice)
-   ⚠️  negative_sentiment: 4 messages
-   ✅ positive_feedback: 1 message
-
-   User B:
-   Messages: 20 (0 voice)
-   — No negative signals detected
+    Got it! The transcription looks perfect.
 ```
 
-## Signal Categories
-
+### Sentiment & Friction Analysis
 | Category | Description / Example Triggers |
 |----------|-------------------------------|
-| `negative_sentiment` | expressions of frustration, difficulty, or issues |
-| `unsatisfied` | feedback indicating expectations were not met |
-| `time_sensitive` | mentions of deadlines, delays, or urgency |
-| `clarification_needed` | instances of confusion or request for more info |
-| `system_issues` | mentions of technical problems or errors |
-| `uncertainty` | expressions of doubt or potential changes |
-| `positive_feedback` ✅ | expressions of satisfaction, approval, or gratitude |
+| `negative_sentiment` | Frustration, difficulty, or negative feedback |
+| `unsatisfied` | Expectations not met, dissatisfaction |
+| `time_sensitive` | Deadlines, delays, or high urgency |
+| `clarification_needed`| Confusion or requests for more information |
+| `system_issues` | Technical problems, bugs, or errors |
+| `uncertainty` | Doubt, potential changes, or hesitation |
+| `positive_feedback` ✅ | Satisfaction, approval, or gratitude |
 
-## Use Cases
+---
 
-- **Freelancers** — review client conversations to improve communication
-- **Agencies** — analyze project history before retrospectives
-- **Support teams** — identify recurring friction patterns
-- **Sales** — understand where deals stall
+## 📂 Use Cases
+- **Freelancers**: Review client communication to improve service delivery.
+- **Agencies**: Analyze project history for better retrospectives.
+- **Support Teams**: Identify recurring pain points in customer interactions.
+- **Personal**: Archive and search through important family or group memories.
 
-## Whisper Model Guide
+---
 
-| Model | Speed | Accuracy | VRAM |
-|-------|-------|----------|------|
-| `tiny` | fastest | lower | ~1GB |
-| `base` | fast | decent | ~1GB |
-| `small` | moderate | good | ~2GB |
-| `medium` | slower | great | ~5GB |
-| `large` | slowest | best | ~10GB |
+## 🔒 Privacy First
+All processing is done **100% locally** on your machine. No chat data, audio files, or transcripts are ever sent to any server. Your privacy is our priority.
 
-For Hebrew, `medium` or `large` recommended.
+---
 
-## Privacy
+## 📜 License
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
-All processing is **100% local**. No data is sent anywhere.  
-Add your export folder to `.gitignore` — never commit real chat data.
+---
 
-## License
-
-MIT © [Aviel.AI](https://aviel.ai)
+⭐ **Found this useful?** Give us a star on GitHub!
+Developed with ❤️ by [Aviel.AI](https://aviel.ai)

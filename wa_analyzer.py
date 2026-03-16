@@ -2,14 +2,14 @@
 """
 WhatsApp Chat Analyzer + Voice Transcriber
 ==========================================
-מנתח ייצוא WhatsApp, מתמלל הקלטות קוליות עם Whisper,
-ומייצר טיימליין מלא + ניתוח שיחה.
+Analyzes WhatsApp export, transcribes voice messages with Whisper,
+and generates a full timeline + conversation analysis.
 
-שימוש:
+Usage:
     pip install openai-whisper
     python wa_analyzer.py --chat "path/to/chat.txt" --media "path/to/media_folder"
 
-דרישות:
+Requirements:
     - Python 3.9+
     - openai-whisper  (pip install openai-whisper)
     - ffmpeg          (brew install ffmpeg / apt install ffmpeg)
@@ -37,6 +37,10 @@ OMITTED_PATTERN = re.compile(r'(audio omitted|voice message|הודעה קולי�
 
 def parse_chat(txt_path: str) -> list[dict]:
     """Parse WhatsApp .txt export into list of message dicts."""
+    if not os.path.exists(txt_path):
+        print(f"Error: File {txt_path} not found.")
+        return []
+
     with open(txt_path, 'r', encoding='utf-8') as f:
         raw = f.read()
 
@@ -78,6 +82,9 @@ def parse_chat(txt_path: str) -> list[dict]:
 def find_voice_file(filename: str, media_dir: str) -> str | None:
     """Search for voice file in media directory (handles renamed files)."""
     media_path = Path(media_dir)
+    if not media_path.exists():
+        return None
+        
     # Exact match
     exact = media_path / filename
     if exact.exists():
@@ -88,7 +95,6 @@ def find_voice_file(filename: str, media_dir: str) -> str | None:
         candidates = list(media_path.glob(f'*{stem}*{ext}'))
         if candidates:
             return str(candidates[0])
-    # Return any audio file by index (fallback — not reliable)
     return None
 
 
@@ -96,18 +102,22 @@ def transcribe_voices(messages: list[dict], media_dir: str, model_size: str = 'm
     """Transcribe all voice messages using Whisper."""
     voice_msgs = [m for m in messages if m['is_voice']]
     if not voice_msgs:
-        print("לא נמצאו הודעות קוליות.")
+        print("No voice messages found.")
         return messages
 
-    print(f"\n🎙️  נמצאו {len(voice_msgs)} הודעות קוליות. טוען Whisper ({model_size})...")
+    print(f"\n🎙️  Found {len(voice_msgs)} voice messages. Loading Whisper ({model_size})...")
     try:
         import whisper
     except ImportError:
-        print("❌ Whisper לא מותקן. הרץ: pip install openai-whisper")
+        print("❌ Whisper not installed. Run: pip install openai-whisper")
         return messages
 
-    model = whisper.load_model(model_size)
-    print(f"✅ מודל Whisper '{model_size}' נטען.")
+    try:
+        model = whisper.load_model(model_size)
+        print(f"✅ Whisper model '{model_size}' loaded.")
+    except Exception as e:
+        print(f"❌ Error loading Whisper model: {e}")
+        return messages
 
     for i, msg in enumerate(voice_msgs, 1):
         audio_path = None
@@ -115,20 +125,20 @@ def transcribe_voices(messages: list[dict], media_dir: str, model_size: str = 'm
             audio_path = find_voice_file(msg['voice_file'], media_dir)
 
         if not audio_path:
-            # Try to find any unmatched audio file by position
-            print(f"  [{i}/{len(voice_msgs)}] ⚠️  קובץ לא נמצא: {msg.get('voice_file','unknown')} — דילוג")
-            msg['transcript'] = '[קובץ קולי — לא נמצא]'
+            print(f"  [{i}/{len(voice_msgs)}] ⚠️  File not found: {msg.get('voice_file','unknown')} — skipping")
+            msg['transcript'] = '[Voice file not found]'
             continue
 
-        print(f"  [{i}/{len(voice_msgs)}] מתמלל: {os.path.basename(audio_path)}...")
+        print(f"  [{i}/{len(voice_msgs)}] Transcribing: {os.path.basename(audio_path)}...")
         try:
-            result = model.transcribe(audio_path, language='he', task='transcribe')
+            # Detect language or specify if needed
+            result = model.transcribe(audio_path, task='transcribe')
             transcript = result['text'].strip()
             msg['transcript'] = transcript
             print(f"          ✅ {transcript[:80]}{'...' if len(transcript)>80 else ''}")
         except Exception as e:
-            msg['transcript'] = f'[שגיאת תמלול: {e}]'
-            print(f"          ❌ שגיאה: {e}")
+            msg['transcript'] = f'[Transcription error: {e}]'
+            print(f"          ❌ Error: {e}")
 
     return messages
 
@@ -137,16 +147,16 @@ def build_timeline(messages: list[dict]) -> str:
     """Build readable timeline with transcripts inline."""
     lines = []
     lines.append("=" * 60)
-    lines.append("  טיימליין שיחה מלא עם תמלולים")
+    lines.append("  Full Conversation Timeline with Transcripts")
     lines.append("=" * 60)
 
     for msg in messages:
         prefix = f"[{msg['date']} {msg['time']}] {msg['sender']}"
 
         if msg['is_voice']:
-            transcript = msg['transcript'] or '[לא תומלל]'
+            transcript = msg['transcript'] or '[Not transcribed]'
             lines.append(f"\n🎙️  {prefix}:")
-            lines.append(f"    📝 תמלול: {transcript}")
+            lines.append(f"    📝 Transcript: {transcript}")
         else:
             body = msg['body'].strip()
             if body and body not in ['', '\u200e']:
@@ -157,7 +167,7 @@ def build_timeline(messages: list[dict]) -> str:
 
 
 def analyze_conversation(messages: list[dict]) -> str:
-    """Generate conversation analysis for future client reference."""
+    """Generate conversation analysis with generic signal categories."""
     senders = {}
     voice_count = 0
     total = len(messages)
@@ -168,70 +178,39 @@ def analyze_conversation(messages: list[dict]) -> str:
         if msg['is_voice']:
             voice_count += 1
 
-    # Find frustration indicators in text + transcripts
-    # ── Multi-category signal bank ──────────────────────────
+    # ── Generic signal categories ──────────────────────────
     SIGNALS = {
-        'תסכול': [
-            # עברית ישירה
-            'מתסכל', 'תסכול', 'מעצבן', 'עצבני', 'כועס', 'כעס',
-            'נמאס', 'נמאס לי', 'מאוס', 'בא לי לזרוק',
-            'לא יכול', 'אין לי כוח', 'עייפתי', 'נלאיתי',
-            'מספיק', 'די', 'זהו', 'נגמר', 'אין סבלנות',
-            # סלנג ישראלי
-            'בלאגן', 'על הפנים', 'אל הפנים', 'חרא', 'זבל',
-            'גרוע', 'גרועה', 'איום', 'נורא', 'סוס מת',
-            'חבל על הזמן', 'חבל', 'ביטול',
-            # ביטויים עמומים של כעס
-            'וואלה לא', 'מה זה', 'מה הסיפור', 'מה קורה פה',
-            'לא יאמן', 'לא יכול להיות', 'זה לא יכול להיות',
+        'negative_sentiment': [
+            'מתסכל', 'תסכול', 'מעצבן', 'עצבני', 'כועס', 'כעס', 'נמאס',
+            'בלאגן', 'על הפנים', 'חרא', 'זבל', 'גרוע', 'איום', 'נורא',
+            'frustrated', 'annoying', 'terrible', 'awful', 'angry', 'hate'
         ],
-        'אי_שביעות_רצון': [
-            'לא מרוצה', 'לא אוהב', 'לא טוב', 'לא עובד',
-            'לא מתאים', 'לא מה שרציתי', 'לא מה שביקשתי',
-            'ציפיתי', 'לא ציפיתי', 'אכזבה', 'מאכזב',
-            'גרוע ממה', 'פחות ממה', 'לא הבנת', 'לא הבנתי',
-            'פספסת', 'לא זה', 'לא ככה',
+        'unsatisfied': [
+            'לא מרוצה', 'לא אוהב', 'לא טוב', 'לא עובד', 'אכזבה', 'מאכזב',
+            'not happy', 'disappointed', 'disappointing', 'not what i asked'
         ],
-        'לחץ_זמן': [
-            'דחוף', 'מהר', 'עכשיו', 'מיד', 'אין זמן',
-            'לוקח זמן', 'מאחר', 'אחרי', 'כבר שבוע', 'כבר חודש',
-            'נמשך', 'ממשיך', 'לא נגמר', 'מתי זה יגמר',
-            'להספיק', 'ספיק', 'לא מספיק',
+        'time_sensitive': [
+            'דחוף', 'מהר', 'עכשיו', 'מיד', 'אין זמן', 'מאחר', 'דדליין',
+            'urgent', 'asap', 'hurry', 'no time', 'late', 'deadline'
         ],
-        'בלבול_ותקשורת': [
-            'לא הבנתי', 'לא ברור', 'מבולבל', 'מבולבלת',
-            'לא הסברת', 'הסבר', 'תסביר', 'מה הכוונה',
-            'איפה', 'מה זה', 'לא רואה', 'לא מוצא',
-            'אי אפשר', 'לא ניתן', 'לא נגיש',
+        'clarification_needed': [
+            'לא הבנתי', 'לא ברור', 'מבולבל', 'הסבר', 'תסביר', 'מה הכוונה',
+            'dont understand', 'not clear', 'confused', 'explain', 'what do you mean'
         ],
-        'בעיות_טכניות': [
-            'לא עובד', 'שבור', 'תקוע', 'קפא', 'קרס',
-            'שגיאה', 'בעיה', 'תקלה', 'לא נטען', 'לא נפתח',
-            'לא רואים', 'לא מוצג', 'נעלם', 'נמחק',
-            'וורדפרס', 'אלמנטור', 'לא מצליח לערוך',
+        'system_issues': [
+            'לא עובד', 'שבור', 'תקוע', 'קפא', 'קרס', 'שגיאה', 'בעיה', 'תקלה',
+            'broken', 'not working', 'crashed', 'error', 'bug', 'failed'
         ],
-        'חרטה_וספק': [
-            'לא בטוח', 'אולי', 'אולי לא', 'חושב לבטל',
-            'לא יודע', 'ספק', 'חרטה', 'מתחרט',
-            'אם הייתי יודע', 'לא היה שווה', 'בזבוז',
-            'היה עדיף', 'פשוט לא', 'בכלל לא',
+        'uncertainty': [
+            'לא בטוח', 'אולי', 'חושב לבטל', 'ספק', 'חרטה',
+            'not sure', 'maybe', 'cancel', 'doubt', 'regret'
         ],
-        'אישור_וחיובי': [
-            # חיובי — לאתר גם רגעים טובים
-            'מעולה', 'מדהים', 'כל הכבוד', 'יפה', 'טוב',
-            'אחלה', 'סבבה', 'בסדר גמור', 'ממש טוב',
-            'אהבתי', 'מוצלח', 'מושלם', 'תודה רבה',
-            'שמח', 'מרוצה', 'מסכים', 'אשר', 'מאשר',
-        ],
-        'english_frustration': [
-            # אנגלית
-            "can't", "cannot", "doesn't work", "not working",
-            "frustrated", "annoying", "terrible", "awful",
-            "waste of time", "useless", "broken", "confused",
-            "don't understand", "what is this", "seriously",
-            "come on", "really?", "ridiculous",
+        'positive_feedback': [
+            'מעולה', 'מדהים', 'כל הכבוד', 'יפה', 'טוב', 'אחלה', 'סבבה', 'תודה',
+            'great', 'amazing', 'good', 'perfect', 'thanks', 'thank you', 'awesome'
         ],
     }
+
     friction_moments = []
     for msg in messages:
         text = (msg['body'] + ' ' + (msg['transcript'] or '')).lower()
@@ -250,39 +229,34 @@ def analyze_conversation(messages: list[dict]) -> str:
 
     lines = []
     lines.append("\n" + "=" * 60)
-    lines.append("  ניתוח שיחה — לשימוש עם לקוחות עתידיים")
+    lines.append("  Conversation Analysis")
     lines.append("=" * 60)
 
-    lines.append(f"\n📊 סטטיסטיקות:")
-    lines.append(f"   סה\"כ הודעות: {total}")
-    lines.append(f"   הודעות קוליות: {voice_count}")
+    lines.append(f"\n📊 Statistics:")
+    lines.append(f"   Total Messages: {total}")
+    lines.append(f"   Voice Messages: {voice_count}")
     for sender, count in sorted(senders.items(), key=lambda x: -x[1]):
-        lines.append(f"   {sender}: {count} הודעות")
+        lines.append(f"   {sender}: {count} messages")
 
-    lines.append(f"\n⚠️  נקודות חיכוך ({len(friction_moments)}):")
+    lines.append(f"\n⚠️  Detected Signals ({len(friction_moments)}):")
     if friction_moments:
-        # Sort: negative categories first
-        negative_cats = {'תסכול','אי_שביעות_רצון','לחץ_זמן','בלבול_ותקשורת','בעיות_טכניות','חרטה_וספק','english_frustration'}
+        negative_cats = {'negative_sentiment', 'unsatisfied', 'time_sensitive', 'clarification_needed', 'system_issues', 'uncertainty'}
         def score(fm):
             return sum(1 for c in fm['categories'] if c in negative_cats)
+        
         friction_moments.sort(key=score, reverse=True)
-        for fm in friction_moments[:12]:
+        for fm in friction_moments[:15]:
             cats = [c for c in fm['categories'] if c in negative_cats]
-            if not cats:
+            if not cats and 'positive_feedback' not in fm['categories']:
                 continue
+            
             lines.append(f"\n   [{fm['time']}] {fm['sender']}:")
-            lines.append(f"   \"{fm['preview']}\"")
-            for cat in cats:
-                lines.append(f"   🏷  {cat}: {', '.join(fm['categories'][cat][:4])}")
+            lines.append(f"   \"{fm['preview']}...\"")
+            for cat, hits in fm['categories'].items():
+                icon = "✅" if cat == 'positive_feedback' else "🏷"
+                lines.append(f"   {icon} {cat}: {', '.join(hits[:5])}")
     else:
-        lines.append("   לא זוהו נקודות חיכוך.")
-
-    # Positive moments
-    positive = [fm for fm in friction_moments if 'אישור_וחיובי' in fm['categories']]
-    lines.append(f"\n✅ רגעי אישור / חיובי ({len(positive)}):")
-    for pm in positive[:5]:
-        lines.append(f"   [{pm['time']}] {pm['sender']}: \"{pm['preview'][:80]}\"")
-
+        lines.append("   No significant signals detected.")
 
     # Per-sender breakdown
     sender_stats = {}
@@ -291,7 +265,7 @@ def analyze_conversation(messages: list[dict]) -> str:
         if s not in sender_stats:
             sender_stats[s] = {
                 'total': 0, 'voice': 0,
-                'friction': {c: 0 for c in SIGNALS},
+                'signals': {c: 0 for c in SIGNALS},
             }
         sender_stats[s]['total'] += 1
         if msg['is_voice']:
@@ -301,51 +275,51 @@ def analyze_conversation(messages: list[dict]) -> str:
         s = fm['sender']
         if s in sender_stats:
             for cat in fm['categories']:
-                if cat in sender_stats[s]['friction']:
-                    sender_stats[s]['friction'][cat] += 1
+                sender_stats[s]['signals'][cat] += 1
 
-    lines.append(f"\n👤 ניתוח לפי שולח:")
+    lines.append(f"\n👤 Per-Sender Breakdown:")
     for sender, stats in sorted(sender_stats.items(), key=lambda x: -x[1]['total']):
         lines.append(f"\n   {sender}:")
-        lines.append(f"   הודעות: {stats['total']} (מתוכן {stats['voice']} קוליות)")
-        active_friction = {c: v for c, v in stats['friction'].items()
-                          if v > 0 and c != 'אישור_וחיובי'}
-        positive_count = stats['friction'].get('אישור_וחיובי', 0)
-        if active_friction:
-            for cat, count in sorted(active_friction.items(), key=lambda x: -x[1]):
-                lines.append(f"   ⚠️  {cat}: {count} הודעות")
-        if positive_count:
-            lines.append(f"   ✅ חיובי/אישור: {positive_count} הודעות")
-        if not active_friction and not positive_count:
-            lines.append(f"   — ללא סיגנלים מיוחדים")
-
-
-    lines.append("   (מבוסס על ניתוח השיחה — יש להשלים ידנית)")
-    lines.append("   1. ___")
-    lines.append("   2. ___")
-    lines.append("   3. ___")
+        lines.append(f"   Messages: {stats['total']} ({stats['voice']} voice)")
+        active_signals = {c: v for c, v in stats['signals'].items() if v > 0}
+        if active_signals:
+            for cat, count in sorted(active_signals.items(), key=lambda x: -x[1]):
+                icon = "✅" if cat == 'positive_feedback' else "⚠️"
+                lines.append(f"   {icon} {cat}: {count} messages")
+        else:
+            lines.append(f"   — No specific signals detected")
 
     return '\n'.join(lines)
 
 
 def main():
     parser = argparse.ArgumentParser(description='WhatsApp Chat Analyzer + Voice Transcriber')
-    parser.add_argument('--chat',  required=True, help='נתיב לקובץ .txt של WhatsApp export')
-    parser.add_argument('--media', default='',    help='נתיב לתיקיית המדיה (הקלטות)')
+    parser.add_argument('--chat',  required=True, help='Path to WhatsApp export .txt file')
+    parser.add_argument('--media', default='',    help='Path to media folder (voice messages)')
     parser.add_argument('--model', default='medium', choices=['tiny','base','small','medium','large'],
-                        help='גודל מודל Whisper (ברירת מחדל: medium)')
-    parser.add_argument('--out',   default='analysis', help='שם קובץ פלט (ללא סיומת)')
-    parser.add_argument('--no-transcribe', action='store_true', help='דלג על תמלול')
+                        help='Whisper model size (default: medium)')
+    parser.add_argument('--out',   default='analysis', help='Output filename prefix (no extension)')
+    parser.add_argument('--no-transcribe', action='store_true', help='Skip transcription')
     args = parser.parse_args()
 
-    print(f"\n📂 קורא שיחה: {args.chat}")
+    if not os.path.exists(args.chat):
+        print(f"❌ Error: Chat file not found at {args.chat}")
+        return
+
+    print(f"\n📂 Reading chat: {args.chat}")
     messages = parse_chat(args.chat)
-    print(f"✅ {len(messages)} הודעות נטענו.")
+    if not messages:
+        print("❌ No messages found in the chat file.")
+        return
+    print(f"✅ {len(messages)} messages loaded.")
 
     if not args.no_transcribe and args.media:
-        messages = transcribe_voices(messages, args.media, args.model)
+        if os.path.exists(args.media):
+            messages = transcribe_voices(messages, args.media, args.model)
+        else:
+            print(f"⚠️  Media folder not found at {args.media}. Skipping transcription.")
     elif not args.no_transcribe and not args.media:
-        print("⚠️  לא צוינה תיקיית מדיה — תמלול ידני נדרש לפי הטיימליין.")
+        print("⚠️  No media folder specified. Skipping transcription.")
 
     # Build outputs
     timeline = build_timeline(messages)
@@ -354,18 +328,26 @@ def main():
 
     # Save text
     out_txt = args.out + '.txt'
-    with open(out_txt, 'w', encoding='utf-8') as f:
-        f.write(full_output)
-    print(f"\n✅ נשמר: {out_txt}")
+    try:
+        with open(out_txt, 'w', encoding='utf-8') as f:
+            f.write(full_output)
+        print(f"\n✅ Saved report: {out_txt}")
+    except Exception as e:
+        print(f"❌ Error saving text report: {e}")
 
-    # Save JSON (raw data for further processing)
+    # Save JSON
     out_json = args.out + '.json'
-    with open(out_json, 'w', encoding='utf-8') as f:
-        json.dump(messages, f, ensure_ascii=False, indent=2)
-    print(f"✅ נשמר: {out_json}")
+    try:
+        with open(out_json, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=2)
+        print(f"✅ Saved raw data: {out_json}")
+    except Exception as e:
+        print(f"❌ Error saving JSON data: {e}")
 
-    # Print summary to screen
-    print(full_output)
+    # Final summary
+    print("\n" + "="*40)
+    print(" Analysis Complete")
+    print("="*40)
 
 
 if __name__ == '__main__':
