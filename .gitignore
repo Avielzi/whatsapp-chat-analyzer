@@ -41,3 +41,6 @@ ENV/
 .vscode/
 .idea/
 .DS_Store
+
+# Streamlit secrets (never commit)
+.streamlit/secrets.toml
