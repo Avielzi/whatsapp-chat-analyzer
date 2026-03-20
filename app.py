@@ -4,9 +4,9 @@ WhatsApp Chat Analyzer — Streamlit Web UI
 import hashlib
 import hmac
 import time
+import os
 import streamlit as st
 import tempfile
-import os
 from pathlib import Path
 
 from wa_analyzer import parse_chat, transcribe_voices, build_timeline, analyze_conversation
@@ -44,7 +44,7 @@ def _check_auth() -> bool:
 
     if st.button("Login", type="primary"):
         input_hash = hashlib.sha256(password.encode()).hexdigest()
-        stored_hash = st.secrets.get("PASSWORD_HASH", "")
+        stored_hash = st.secrets.get("PASSWORD_HASH", "") or os.environ.get("PASSWORD_HASH", "")
 
         if stored_hash and hmac.compare_digest(input_hash, stored_hash):
             st.session_state["auth"] = True
